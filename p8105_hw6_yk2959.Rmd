@@ -186,7 +186,7 @@ I plotted a model of residuals against fitted values by using add_predictions an
 ```{r}
 plot_1 = lm(bwt ~ blength + gaweeks, data = birthweight_df_clean) 
 
-plot_2 = lm(bwt ~ bhead + blength + babysex + bhead:blength + bhead:babysex + blength:babysex, data = birthweight_df_clean) 
+plot_2 = lm(bwt ~ bhead * blength * babysex, data = birthweight_df_clean) 
 
 ```
 
