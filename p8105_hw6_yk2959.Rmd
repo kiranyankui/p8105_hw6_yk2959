@@ -1,0 +1,115 @@
+---
+title: "p8105_hw6_yk2959"
+author: "Kiran Kui"
+date: "2022-11-29"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(p8105.datasets)
+library(viridis)
+library(readxl)
+library(dplyr)
+library(purrr)
+library(ggplot2)
+```
+
+
+# Problem 2
+
+```{r}
+homicide_df = read_csv("./data/homicide-data.csv") %>%
+  janitor::clean_names() 
+
+skimr::skim(homicide_df)
+```
+
+I have imported the homicide dataset from the github repository and tidied the names of the variables in the dataset. 
+
+## Brief introduction of the raw homicide dataset 
+
+The raw dataset contains `r nrow(homicide_df)` rows and `r ncol(homicide_df)` columns, with each row representing a single record of homicide in 50 large U.S. cities. 
+
+Variables include, date of homicide, victim first and last name, victims' race, age, sex and the city/state that the homicide was located, as well as the lattitude and longitude of the homicide location, given in `r colnames(homicide_df)`. 
+
+```{r}
+homicide_df_clean_1 = homicide_df %>% 
+  unite(city_state, c(city, state), sep = ", ", remove = FALSE) %>% 
+  select(-city, -state) %>% 
+  mutate(
+  resolved = ifelse(
+  disposition %in% c('Closed without arrest', 'Open/No arrest'), 0, 1)) %>% 
+    filter(!city_state %in% c('Dallas, TX', 'Phoenix, AZ', 'Kansas City, MO', 'Tulsa, AL')) %>%    filter(victim_race %in% c('Black', 'White')) %>%
+  mutate(victim_age = as.numeric(victim_age))
+
+homicide_df_clean_1
+```
+
+I create a city_state variable (e.g. “Baltimore, MD”), and a binary variable indicating whether the homicide is solved. I then omitted cities Dallas, TX; Phoenix, AZ; and Kansas City, MO because these don’t report victim race and also omit Tulsa, AL because this is a data entry mistake. I limited my analysis those for whom victim_race is white or black.I converted victim_age from a character to a numeric variable. 
+
+```{r}
+fit_logistic = homicide_df_clean_1 %>% 
+  filter(city_state %in% c('Baltimore, MD')) %>% 
+  glm(resolved ~ victim_age + victim_sex + victim_race, data = ., family = binomial()) %>% 
+  broom::tidy() %>% 
+  mutate(
+    odds_ratio = exp(estimate),
+    lower_CI = exp(estimate - 1.96 * std.error),
+    upper_CI = exp(estimate + 1.96 * std.error)
+  ) %>% 
+  select(term, odds_ratio, lower_CI, upper_CI) %>%
+  filter(term == "victim_sexMale") %>% 
+  knitr::kable(digits = 3)
+
+fit_logistic
+
+```
+
+For the city of Baltimore, MD, I used the glm function to fit a logistic regression with resolved vs unresolved as the outcome and victim age, sex and race as predictors. 
+
+I saved the output of glm as an R object and applied the broom::tidy to this object then obtained the estimate and confidence interval of the adjusted odds ratio for solving homicides comparing male victims to female victims keeping all other variables fixed.
+
+```{r}
+
+homicide_df_clean_2 = 
+  homicide_df_clean_1 %>% 
+  nest(data = -city_state) %>% 
+mutate(
+  all_countries = 
+    map(.x = data, ~glm(glm(resolved ~ victim_age + victim_race + victim_sex, data = .x, family = binomial()))),
+  result = map(all_countries, broom::tidy) 
+  ) %>% 
+select(city_state, result) %>% 
+ unnest(result) %>% 
+  mutate(
+    odds_ratio = exp(estimate),
+    lower_CI = exp(estimate - 1.96 * std.error),
+    upper_CI = exp(estimate + 1.96 * std.error)
+  ) %>% 
+  select(city_state, term, odds_ratio,lower_CI, upper_CI) %>% 
+  filter(term == "victim_sexMale") %>% 
+  mutate(city_state = fct_reorder(city_state, odds_ratio)) 
+
+ggplot_q2 = 
+  homicide_df_clean_2 %>% 
+  ggplot(aes(x = city_state, y = odds_ratio)) + 
+  geom_point() + 
+  geom_errorbar(aes(ymin = lower_CI, ymax = upper_CI)) + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) + 
+  labs(title = "Plot showing the estimated ORs and CIs for each city",
+    x = "City, State",
+    y = "Odds Ratio")
+
+ggplot_q2
+
+```
+
+I ran a glm for each of the cities in your dataset, and extracted the adjusted odds ratio (and CI) for solving homicides comparing male victims to female victims. Do this within a “tidy” pipeline, making use of purrr::map, list columns, and unnest as necessary to create a dataframe with estimated ORs and CIs for each city.
+
+I created a plot that shows the estimated ORs and CIs for each city and organized cities according to estimated OR, and comment on the plot.
+
+
+
