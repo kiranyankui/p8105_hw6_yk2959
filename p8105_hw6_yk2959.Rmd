@@ -15,6 +15,7 @@ library(readxl)
 library(dplyr)
 library(purrr)
 library(ggplot2)
+library(modelr)
 ```
 
 
@@ -66,6 +67,8 @@ fit_logistic = homicide_df_clean_1 %>%
 
 fit_logistic
 
+summary(fit_logistic)
+
 ```
 
 For the city of Baltimore, MD, I used the glm function to fit a logistic regression with resolved vs unresolved as the outcome and victim age, sex and race as predictors. 
@@ -111,5 +114,91 @@ I ran a glm for each of the cities in your dataset, and extracted the adjusted o
 
 I created a plot that shows the estimated ORs and CIs for each city and organized cities according to estimated OR, and comment on the plot.
 
+# Problem 3
 
+```{r}
+birthweight_df = read_csv("./data/birthweight.csv") %>%
+  janitor::clean_names() 
+
+skimr::skim(birthweight_df)
+```
+
+I have imported the birthweight dataset from the csv file and tidied the names of the variables in the dataset. 
+
+## Brief introduction of the birthweight dataset 
+
+The raw dataset contains `r nrow(birthweight_df)` rows and `r ncol(birthweight_df)` columns, with each row representing a single record of a child. 
+
+Variables include:
+
+* details of the baby such as birthweight in grams, sex of the baby, head circumference, length at birth(cm), etc. 
+* details of the mother, such as mother’s weight at delivery (pounds), mother’s age at menarche (years) and mother’s height (inches). 
+* one sociodemographic variables about the family was also present - family monthly income (in hundreds, rounded). 
+
+__The full list of variabes is given in `r colnames(birthweight_df)`.__
+
+```{r}
+birthweight_df_clean = birthweight_df %>% 
+  mutate(malform = as.factor(malform),
+         babysex = as.character(babysex),
+         mrace = as.character(mrace),         
+         frace = as.character(frace)) 
+
+```
+I tidied the dataset by double checking if there was missing values (there was none), converting malform, which is the presence or absence of malformations that could affect weight into factor variables. 
+
+
+```{r}
+
+my_birthweight_model = lm(bwt ~ babysex + smoken + ppbmi + mrace + gaweeks, data = birthweight_df_clean) 
+
+my_birthweight_model_tidy = lm(bwt ~ babysex + smoken + ppbmi + mrace + gaweeks, data = birthweight_df_clean) %>% 
+  broom::tidy() %>% 
+  knitr::kable()
+
+my_birthweight_model_tidy
+# Do I the model like this? 
+
+```
+
+I proposed a hypothesized regression model for birthweight based on a [PubMed article](https://pubmed.ncbi.nlm.nih.gov/7114129/#:~:text=The%20sex%20of%20the%20infant,be%20important%20and%20significant%20factors), which describes the important and signficant determinants of birthweight.
+
+The following are determinants of birthweight reported that is also present in our dataset: 
+
+* sex of the baby (babysex)
+* average number of cigarettes smoked per day during pregnancy  (smoken)
+* maternal BMI pre-pregnancy (ppbmi)
+* maternal race (mrace), __differences in baby birthweights between racial groups are due to underlying structural racism__
+* gestational age in weeks (gaweeks)
+
+Based on the model, all parameter estimates are significant with a p value of smaller than 0.05. As such, this shows that my model is reasonable and there is no need to remove any insignificant predictors using a backwards stepwise approach. 
+
+```{r}
+birthweight_df_clean %>% 
+  add_residuals(my_birthweight_model) %>%
+    add_predictions(my_birthweight_model) %>% 
+      ggplot(aes(x = pred, y = resid)) + geom_point()
+
+```
+
+I plotted a model of residuals against fitted values by using add_predictions and add_residuals in making this plot. The residual plot shows that there is  random scatter of points forming an approximately constant width band around the identity line, showing that the variance is approximately constant. 
+
+```{r}
+plot_1 = lm(bwt ~ blength + gaweeks, data = birthweight_df_clean) 
+
+plot_2 = lm(bwt ~ bhead + blength + babysex + bhead:blength + bhead:babysex + blength:babysex, data = birthweight_df_clean) 
+
+```
+
+
+Compare your model to two others:
+
+* One using length at birth and gestational age as predictors (main effects only) - plot 1
+* One using head circumference, length, sex, and all interactions (including the three-way interaction) between these - plot 2
+
+
+
+```{r}
+
+```
 
